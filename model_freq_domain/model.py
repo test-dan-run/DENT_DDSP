@@ -1,20 +1,17 @@
-from .utils import *
-from .core import exp_sigmoid, frequency_filter,compressor_time_averaged, distortion_actan, clip_by_value
-
-import tensorflow as tf
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="3"
-import math
-import numpy as np
-from typing import Any, Dict, Optional, Sequence, Text, TypeVar
-import soundfile as sf
-from scipy.io.wavfile import write
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
+from .utils import *
+from .core import exp_sigmoid, frequency_filter, compressor_time_averaged, distortion_actan, clip_by_value
+
 import yaml
-# import ddsp
+import numpy as np
+import soundfile as sf
+import tensorflow as tf
+from typing import Dict, Text
+
 TensorDict = Dict[Text, tf.Tensor]
-
-
 
 class SpectralLoss(tf.keras.layers.Layer):
 
@@ -146,37 +143,24 @@ class distortion(Processor):
 
 		return out
 
-	# def call(self,input_file):
-	# 	distorted=(2/math.pi) * tf.math.atan( (math.pi/self.distortion_threshold) * input_file)
-	# 	return distorted
-
-#FIR
 class FIRFilter(Processor):
 	"""Linear time-varying finite impulse response (LTV-FIR) filter."""
 
-	def __init__(self,
-							 window_size=257,
-							#  scale_fn=exp_sigmoid,
-							scale_fn = clip_by_value,
-							 name='fir_filter',
-							 magnitude_init = None,
-							 n_frequency_bins = None,
-							 n_frames = None ):
+	def __init__(self, window_size=257, scale_fn = clip_by_value, name='fir_filter', magnitude_init = None, n_frequency_bins = None, n_frames = None):
+
 		super().__init__(name=name)
 		self.window_size = window_size
 		self.scale_fn = scale_fn
 		self.magnitude_init = magnitude_init
 		self.n_frequency_bins = n_frequency_bins
 		self.n_frames = n_frames
+
 	def build(self, input_shape):  
 		if self.magnitude_init is None:
 			initializer = tf.random_normal_initializer() #pending change!
 			if self.n_frames is None: 
-				# magnitudes_init = initializer(shape=(input_shape[0],self.n_frequency_bins), dtype='float32') #batch_size, n_frames, n_frequencies or batch_size, n_frames, n_frequencies
 				magnitudes_init = initializer(shape=(1,self.n_frequency_bins), dtype='float32') #batch_size, n_frames, n_frequencies or batch_size, n_frames, n_frequencies
-
 			else:
-				# magnitudes_init = initializer(shape=(input_shape[0],self.n_frames, self.n_frequency_bins), dtype='float32') #batch_size, n_frames, n_frequencies or batch_size, n_frames, n_frequencies
 				magnitudes_init = initializer(shape=(1,self.n_frames, self.n_frequency_bins), dtype='float32') #batch_size, n_frames, n_frequencies or batch_size, n_frames, n_frequencies
 
 		else:
@@ -185,7 +169,6 @@ class FIRFilter(Processor):
 		self.magnitudes= tf.Variable(name = "fir_mag",
 			initial_value=magnitudes_init,
 			trainable=True)
-
 
 	def get_controls(self, audio ):
 		"""Convert network outputs into magnitudes response.
@@ -219,19 +202,18 @@ class FIRFilter(Processor):
 		# print(out.shape,out, "inside")
 		return out
 
-#DRC
 class DynamicRangeCompressor(Processor):
 	def __init__(self, sr,threshold_init,ratio_init, makeup_init,attack_init, release_init, downsample_factor = 16.0, name = "drc"):
+
 		super().__init__(name=name)
 		self.threshold_init = threshold_init
 		self.ratio_init = ratio_init
 		self.makeup_init = makeup_init
-		# self.attack_time_init= attack_init
-		# self.release_time_init = release_init
 		self.attack_time_init=tf.math.exp(-log10(9.0)/(sr*attack_init*1.0E-3*downsample_factor))
 		self.release_time_init=tf.math.exp(-log10(9.0)/(sr*release_init*1.0E-3*downsample_factor))
 		self.sr = sr
 		self.downsample_factor = downsample_factor
+
 	def build(self, input_shape): 
 		self.threshold = tf.Variable(name="threshold", initial_value=self.threshold_init, trainable=True)
 		self.ratio = tf.Variable(name="ratio", initial_value=self.ratio_init, trainable=True)
@@ -240,8 +222,8 @@ class DynamicRangeCompressor(Processor):
 		self.release_time = tf.Variable(name="release_time_constant", initial_value=self.release_time_init, trainable=True) #pendin change
 
 	def get_controls(self, audio):
-		
 		return  {'audio': audio, 'sr':self.sr,'threshold': self.threshold, 'ratio':self.ratio, 'makeup':self.makeup,'attack_time':self.attack_time, 'release_time':self.release_time, 'downsample_factor':self.downsample_factor}
+
 	def get_signal(self, audio, sr, threshold, ratio,makeup, attack_time,  release_time, downsample_factor):
 		out = compressor_time_averaged(audio,sr,threshold, ratio,makeup, attack_time,  release_time, downsample_factor)
 		return out
@@ -249,9 +231,7 @@ class DynamicRangeCompressor(Processor):
 #Filtered noise
 class FilteredNoise(Processor):
 	def __init__(self,
-				# n_samples=64000,
 				window_size=257,
-				# scale_fn=exp_sigmoid,
 				scale_fn = clip_by_value,
 				name='filtered_noise',
 				initial_bias_init=None,
@@ -259,6 +239,7 @@ class FilteredNoise(Processor):
 				n_frequency_bins = None,
 				n_frames = None 
 				):
+
 		super().__init__(name=name)
 		# self.n_samples = n_samples
 		self.window_size = window_size
@@ -267,6 +248,7 @@ class FilteredNoise(Processor):
 		self.magnitude_init = magnitude_init
 		self.n_frequency_bins = n_frequency_bins
 		self.n_frames = n_frames
+
 	def build(self, input_shape):  # Create the state of the layer (weights)
 
 		if self.magnitude_init is None:
@@ -291,7 +273,7 @@ class FilteredNoise(Processor):
 			self.initial_bias= tf.Variable(name = "noise_amp_bias",
 				initial_value=self.initial_bias_init,
 				trainable=True)
-		# print("hello")
+
 	def get_controls(self, audio):
 		"""Convert network outputs into a dictionary of synthesizer controls.
 		Args:
@@ -323,31 +305,23 @@ class FilteredNoise(Processor):
 									window_size=self.window_size)
 		return out
 
-
-
 class signal_chain_gpu(tf.keras.Model):
 	def __init__(self, EQ_cfg = None, DRC_cfg = None, waveshaper_cfg=None, noise_cfg = None):
 		super(signal_chain_gpu, self).__init__()
 
-		#processor_dict: {proc1: parameter1, proc2:parameter2}
-		# self.proc_lst = []
-
 		if waveshaper_cfg is not None:
 			self.waveshaper = distortion(**waveshaper_cfg)
-			# self.proc_lst.append(self.waveshaper)	
+
 		if DRC_cfg is not None:
 			self.DRC = DynamicRangeCompressor(**DRC_cfg)
-			# self.proc_lst.append(self.DRC)
 		
 		if EQ_cfg is not None:
 			self.EQ = FIRFilter(**EQ_cfg)
-			# self.proc_lst.append(self.EQ)
 
 		if noise_cfg is not None:
 			self.noise = FilteredNoise(**noise_cfg)
 		else:
 			self.noise = None
-			# self.proc_lst.append(self.noise)
 		
 	def call(self, output):
 
@@ -366,63 +340,21 @@ class signal_chain_gpu(tf.keras.Model):
 
 		return output
 
-
 if __name__ == "__main__":
 
 	with open ('../config/model.yaml', 'r') as f:
 		cfg = yaml.safe_load(f)
 	sample_rate = 16000
 	frame_rate = 100
-	
-	# audio_path = "../440_1_freq.wav"
+
 	audio_path = "../input_clean_32FP.wav"
 	audio,sample_rate = sf.read(audio_path)
-	# n_seconds = audio.size // sample_rate
 	n_seconds = 10.0
 	n_frames = int(n_seconds * frame_rate)
 	n_samples = int(n_seconds * sample_rate)
 
 	audio = audio[np.newaxis, :]
 	audio_trimmed = audio[:, :n_samples]
-
-	"""specplot(audio_trimmed[0], fig_name="sinori.png")
-
-
-
-	magnitudes = create_gauss_mag(n_seconds, sample_rate, frame_rate, cfg['n_frequencies']) #[batch, n_frames, n_freq]
-
-	# fir_filter = FIRFilter(scale_fn=None, magnitude_init = magnitudes)
-	# fir_filter = FIRFilter(scale_fn=None, n_frequency_bins=  cfg['n_frequencies'])
-	fir_filter = FIRFilter(**cfg['FIRfilter'])
-
-	audio_out = fir_filter(audio_trimmed)
-	print(fir_filter.trainable_variables)
-	sf.write("filtered_audio.wav", audio_out[0].numpy(), sample_rate) 
-
-	#test filtered noise
-	# cfg['filtered_noise']['magnitude_init'] = tf.cast(magnitudes, tf.float32) #change here to pass in magn
-	noise_gen = FilteredNoise(**cfg['filtered_noise'])
-	# noise_gen = FilteredNoise(scale_fn=None, initial_bias_init= -5.0,magnitude_init= tf.cast(magnitudes, tf.float32))
-	# noise_gen = FilteredNoise(initial_bias_init= 0.0,n_frequency_bins=  cfg['n_frequencies'])
-	# noise, raw_noise = noise_gen(4*sample_rate)
-	noise = noise_gen(audio_trimmed)
-
-	sf.write("noise.wav",noise[0].numpy(), sample_rate) 
-
-	spec_gainplot(noise_gen.magnitudes.numpy(), "noisegain.png")
-	specplot(noise[0].numpy(), fig_name="noise.png")
-
-	#test compressor
-	comp = DynamicRangeCompressor(**cfg['compressor'])
-
-	audio_comped = comp(audio_trimmed)
-	sf.write("comped_sin.wav", audio_comped[0].numpy(), sample_rate)
-
-	#test dist
-	dist = distortion(**cfg['distortion'])
-	audio_dist = dist(audio_trimmed)
-	sf.write("disted_sin.wav", audio_dist[0].numpy(), sample_rate) 
-	print("check ", dist.distortion_threshold.trainable,dist.trainable_variables, dist.trainable_weights)"""
 
 	#test processor group
 	signal_chain_gpu = signal_chain_gpu(EQ_cfg = cfg['FIRfilter'], DRC_cfg = cfg['compressor'], waveshaper_cfg=cfg['distortion'], noise_cfg = cfg['filtered_noise'])
@@ -431,12 +363,5 @@ if __name__ == "__main__":
 		out = signal_chain_gpu(inp)
 		return out
 	audio_out = train_step(audio_trimmed)
-	# print(f"{signal_chain_gpu.trainable_variables}")
-	# audio_out = signal_chain_gpu(audio_trimmed)
-	sf.write("final_out.wav", audio_out[0].numpy(), sample_rate) 
 
-	# print("audio out", audio_out.shape)
-	# dense = SimpleDense()
-	# a = tf.convert_to_tensor([[1., 2., 3., 3.]])
-	# b = tf.convert_to_tensor([[1., 2., 3., 3., 5.]])
-	# print(dense, dense((a, b)), dense.trainable_variables)
+	sf.write("final_out.wav", audio_out[0].numpy(), sample_rate) 
