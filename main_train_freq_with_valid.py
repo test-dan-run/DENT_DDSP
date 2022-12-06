@@ -1,9 +1,8 @@
 import tensorflow as tf
-import tensorflow as tf
 # physical_devices = tf.config.experimental.list_physical_devices('GPU')
 # if len(physical_devices) > 0:
 #     tf.config.experimental.set_memory_growth(physical_devices[2], True)
-device = "1"
+device = "0"
 import os
 import time
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"

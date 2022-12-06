@@ -82,7 +82,7 @@ def get_statistics(final_lst_np, sr = 8000, energy_thresh=50, save_figname = Non
 	if save_figname is not None:
 		plt.savefig(save_figname)
 
-def select_data(input_total_data,ratio_threshold = (0.8, 1.0), total_amount = 10, sr = 8000, energy_thresh = 50):
+def select_data(input_total_data,ratio_threshold = (0.8, 1.0), total_amount = 100, sr = 8000, energy_thresh = 50):
 	print("selecting data based on s2t_ratio, total amount...")
 
 	#total amount in seconds
@@ -164,7 +164,8 @@ def test_rms(audio_clean, audio_noisy):
 	rms_audio_clean = sum(x**2 for x in audio_clean_array)/len(audio_clean_array)
 	rms_audio_noisy = sum(x**2 for x in audio_noisy_array)/len(audio_noisy_array)
 	print("heu",rms_audio_clean, rms_audio_noisy)
-class audio_reader():
+
+class AudioReader():
 	def __init__(self, audio_file_path = None, if_pad_end = False, if_noise_floor = False, sample_rate = None, np_array = None):
 		self.audio_file_path = audio_file_path
 		if np_array is not None: 
@@ -172,11 +173,11 @@ class audio_reader():
 				self.sample_array = np.load(np_array)
 			except:
 				self.sample_array = np_array
-			self.sample_rate = 8000
+			self.sample_rate = sample_rate
 			self.dbfs = self.get_loudness()
 		else:
 			if sample_rate is not None and sample_rate!=8000:
-				self.sample_array, self.sample_rate = librosa.load(audio_file_path, sample_rate)
+				self.sample_array, self.sample_rate = librosa.load(audio_file_path, sr=sample_rate)
 			else:
 				self.sample_array, self.sample_rate = sf.read(audio_file_path) #pengding change
 			self.dbfs = self.get_loudness()
@@ -210,8 +211,8 @@ class audio_reader():
 
 def process_one_pair(clean_path, noisy_path, sr):
 
-	noisy_audio = audio_reader(audio_file_path = noisy_path, sample_rate = sr)
-	clean_audio = audio_reader(audio_file_path = clean_path, sample_rate = sr)
+	noisy_audio = AudioReader(audio_file_path = noisy_path, sample_rate = sr)
+	clean_audio = AudioReader(audio_file_path = clean_path, sample_rate = sr)
 
 	#normalize volume
 	clean_audio_normed, noisy_audio_normed = normalize_audio_volumes(clean_audio, noisy_audio)
@@ -241,10 +242,14 @@ def process_one_pair(clean_path, noisy_path, sr):
 def process_dirs_of_files(parent_dir , sr):
 	final_lst = []
 	clean_paths = sorted(glob.glob(f"{parent_dir}/clean/*.wav"))
+	print(clean_paths)
 	noisy_paths = sorted(glob.glob(f"{parent_dir}/noisy/*.wav"))
 
 	for clean_path, noisy_path in zip(clean_paths, noisy_paths):
-		assert clean_path.split("/")[-1].split("_")[0] == noisy_path.split("/")[-1].split("_")[0]
+		clean_fn = os.path.basename(clean_path)
+		noisy_fn = os.path.basename(noisy_path)
+
+		assert clean_fn[:4] == noisy_fn[:4] and clean_fn.replace('.wav', '')[-2:] == noisy_fn.replace('.wav', '')[-2:]
 		output = process_one_pair(clean_path, noisy_path, sr)
 		if output is not None:
 			final_lst.append(output)
@@ -252,13 +257,13 @@ def process_dirs_of_files(parent_dir , sr):
 if __name__ == '__main__':
 	
 	SEED = 265
-	sr = 8000
+	sr = 16000
 	random.seed(SEED)
 	if_get_status = False
 	ratio_threshold = (0.8, 1.0)
 	energy_thresh = 50
-	total_train_amount = 10
-	parent_dir = "RATs_data_mid"
+	total_train_amount = 100
+	parent_dir = "../data"
 	
 	#convert everything into 1s chunks
 	final_lst = process_dirs_of_files(parent_dir, sr = sr)

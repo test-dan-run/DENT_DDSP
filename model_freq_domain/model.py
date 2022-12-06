@@ -306,7 +306,7 @@ class FilteredNoise(Processor):
 		return out
 
 class signal_chain_gpu(tf.keras.Model):
-	def __init__(self, EQ_cfg = None, DRC_cfg = None, waveshaper_cfg=None, noise_cfg = None):
+	def __init__(self, EQ_cfg = None, DRC_cfg = None, waveshaper_cfg=None, noise_cfg = None, noise_adjustment=0.0):
 		super(signal_chain_gpu, self).__init__()
 
 		if waveshaper_cfg is not None:
@@ -322,6 +322,8 @@ class signal_chain_gpu(tf.keras.Model):
 			self.noise = FilteredNoise(**noise_cfg)
 		else:
 			self.noise = None
+
+		self.noise_adjustment = noise_adjustment
 		
 	def call(self, output):
 
@@ -332,12 +334,15 @@ class signal_chain_gpu(tf.keras.Model):
 			output = self.DRC(output)
 
 		if self.EQ is not None:
-
 			output = self.EQ(output)	
 
 		if self.noise is not None:
-			output = output+self.noise(output)
+			noise = self.noise(output)
+			if self.noise_adjustment > 0.0:
+				adj_linear = 20**(self.noise_adjustment/20)
+				noise*=adj_linear
 
+			output = output+noise
 		return output
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
-sampling_rate: &sr_ 8000
+sampling_rate: &sr_ 16000
 n_frequencies: &nfreq
 learning_rate: 0.001
 epochs: 150 #75 #50
-data_path_train: "/home/emrys/G/zixun/neural_noisy_speech/data_processing/RATs_data_mid/rats_small_train_thd0.8,1.0_sr8000_len10.npy"
-data_path_valid: "/home/emrys/G/zixun/neural_noisy_speech/data_processing/RATs_data_mid/rats_small_valid_thd0.8,1.0_sr8000_len585.npy" #add up to 595
-sr: 8000
+data_path_train: "/dent/data/rats_small_train_thd0.8,1.0_sr16000_len88.npy"
+data_path_valid: "/dent/data/rats_small_valid_thd0.8,1.0_sr16000_len28.npy"
+sr: 16000
 max_to_keep: 100
 batch_size: 8
 

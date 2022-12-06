@@ -1,4 +1,4 @@
-sampling_rate: &sr_ 8000
+sampling_rate: &sr_ 16000
 n_frequencies: &nfreq 1000
 
 
